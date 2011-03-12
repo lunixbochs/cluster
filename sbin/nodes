@@ -1,0 +1,13 @@
+#!/usr/bin/python
+hosts = [host for host in open('/etc/hosts').read().split('\n') if '#Cluster Node' in host]
+if len(hosts) > 0:
+	hdict = {}
+	for host in hosts:
+		ip, hostname = host.split('#',1)[0].split(' ',1)
+		hdict[hostname] = ip
+
+	for hostname in sorted(hdict):
+		ip = hdict[hostname] 
+		print '%s - %s' % (hostname.strip(), ip)
+else:
+	print 'No nodes found.'

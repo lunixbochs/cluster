@@ -1,0 +1,16 @@
+#!/bin/sh
+
+echo "Welcome to the cluster bridge!"
+echo
+echo "Commands:"
+echo " * all [command]"
+echo "   - run a command on all nodes"
+echo " * ssh [node] (command)"
+echo "   - log directly into a node"
+echo "   - optionally run (command) on node and exit"
+echo " * nodes"
+echo "   - list all connected nodes"
+echo
+echo "Available nodes:"
+nodes
+echo

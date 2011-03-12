@@ -1,0 +1,6 @@
+DEFAULT linux
+LABEL linux
+	KERNEL vmlinuz
+	APPEND root=/dev/nfs initrd=initrd nfsroot=192.168.0.3:/chroot/maverick
+# bootargs init=/bin/sh
+	IPAPPEND 3

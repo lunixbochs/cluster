@@ -1,0 +1,34 @@
+#!/usr/bin/python
+import sys, os
+
+if len(sys.argv) == 1:
+	print 'Usage: all [command]'
+	sys.exit(1)
+
+command = 'ssh %%s %s' % ' '.join(sys.argv[1:])
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+hosts = [host for host in open('/etc/hosts').read().split('\n') if '#Cluster Node' in host]
+if len(hosts) > 0:
+		hdict = {}
+		for host in hosts:
+				ip, hostname = host.split('#',1)[0].split(' ', 1)
+				hdict[hostname.strip()] = ip
+
+		for hostname in sorted(hdict):
+			sys.stdout.write('%s-======================[%s %s %s]======================-%s\n' % (bcolors.WARNING, bcolors.HEADER,
+											hostname,
+											 bcolors.WARNING, bcolors.ENDC))
+			sys.stdout.flush()
+			#print '%s:' % hostname
+			os.system(command % hostname)
+else:
+		print 'No nodes found.'
+		

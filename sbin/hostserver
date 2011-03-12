@@ -1,0 +1,193 @@
+#!/usr/bin/python
+import select, socket
+
+import thread
+import re
+bindRegex = re.compile(r'(tcp|udp)://([^:]+):(\d+)')
+
+from twisted.internet import defer, reactor
+from twisted.names.server import DNSServerFactory
+from twisted.names import common, dns
+from twisted.python import failure
+
+class BaseResolver(common.ResolverBase):
+	def _lookup(self, name, cls, record, timeout):
+		result = None
+		if cls == dns.IN:
+			result = self.lookup(name, record)
+
+		return result or defer.fail(failure.Failure(dns.DomainError(name)))
+
+class AResolver(BaseResolver):
+	def __init__(self, ttl=300):
+		BaseResolver.__init__(self)
+		self.ttl = ttl
+		self.hosts = {}
+	
+	def addHost(self, host, target):
+		self.hosts[host] = target
+	
+	def removeHost(self, host):
+		if host in self.hosts:
+			del self.hosts[host]
+
+	def lookup(self, name, record):
+		if record == dns.A:
+			name = name.lower()
+			if name in self.hosts:
+				target = self.hosts[name]
+
+				record = dns.Record_A(target)
+				rr = dns.RRHeader(name, record.TYPE, dns.IN, self.ttl, record, auth=True)
+
+				return defer.succeed(([rr], [], []))
+
+class PyNamed:
+	def __init__(self, resolver, binds=('tcp://127.0.0.1:53', 'udp://127.0.0.1:53')):
+		factory = DNSServerFactory(authorities=(resolver,), verbose=1)
+		protocol = dns.DNSDatagramProtocol(factory)
+
+		for bind in binds:
+			match = bindRegex.match(bind)
+			if match:
+				transport, host, port = match.groups()
+				port = int(port)
+				if transport == 'tcp':
+					reactor.listenTCP(port, factory, interface=host)
+				elif transport == 'udp':
+					reactor.listenUDP(port, protocol, interface=host)
+			else:
+				print 'badly-formed bind string:', bind
+	
+	def run(self):
+		reactor.run()
+
+resolver = AResolver()
+named = PyNamed(resolver)
+
+hosts = open('/etc/hosts', 'r').read().split('\n')
+hosts = [host for host in hosts if not '#Cluster Node' in host]
+hosts.append('')
+
+hostfiles = ['/etc/hosts', '/nfsroot/maverick/etc/hosts']
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.setsockopt(	socket.SOL_SOCKET, socket.SO_REUSEADDR,
+			server.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR) | 1 )
+server.bind(('', 8000))
+server.listen(1)
+
+sockets = [server]
+socketmap = {}
+
+def resetHosts():
+	for fname in hostfiles:
+		fhosts = [host for host in open(fname, 'r').read().split('\n') if not '#Cluster Node' in host]
+		open(fname, 'w').write('\n'.join(fhosts))
+
+hosts = {}
+def updateHosts():
+	for fname in hostfiles:
+		fhosts = [host for host in open(fname, 'r').read().split('\n')]
+
+		old = {}
+		ohosts = []
+		for host in fhosts:
+			if '#Cluster Node' in host:
+				ip, hostname = host.split('#',1)[0].split(' ',1)
+				if ip in hosts:
+					hostname = hostname.strip()
+					old[ip] = hostname
+					old[hostname] = ip
+			else:
+				ohosts.append(host)
+		
+		ohosts = ('\n'.join(ohosts)).rstrip().split('\n')
+
+		i = 1
+
+		if len(hosts) > 0:
+			ohosts.append('')
+
+		for host in hosts:
+			if host in old:
+				ohosts.append('%s %s #Cluster Node' % (host, old[host]))
+				hosts[host] = old[host]
+			else:
+				name = 'n%i' % i
+				while name in old:
+					name = 'n%i' % i
+					i += 1
+
+				ohosts.append('%s %s #Cluster Node' % (host, name))
+				hosts[host] = 'n%i' % i
+				i += 1
+
+		ohosts.append('')
+		open(fname, 'w').write('\n'.join(ohosts))
+
+class Connection:
+	def __init__(self, conn, addr):
+		self.conn = conn
+		self.addr = addr
+		self.extra = ''
+	
+	def update(self):
+		try:
+			data = self.conn.recv(1024)
+			if data == '':
+				return False
+
+			split = (self.extra + data).split('\n')
+			lines, self.extra = split[:-1], split[-1]
+			for line in lines:
+				self.handle(line)
+		except socket.error:
+			return False
+		
+		return True
+	
+	def handle(self, msg):
+		self.send(msg)
+	
+	def send(self, msg):
+		self.conn.send(msg+'\n')
+
+def addHost(conn, addr):
+	print 'Host added: %s' % addr
+	hosts[addr] = None
+	socketmap[conn] = Connection(conn, addr)
+	sockets.append(conn)
+	updateHosts()
+
+	if hosts[addr]:
+		resolver.addHost(hosts[addr], addr)
+
+def removeHost(conn):
+	addr = socketmap[conn].addr
+	print 'Host removed: %s' % addr
+	
+	if hosts[addr]:
+		resolver.removeHost(hosts[addr])
+
+	hosts.remove(addr)
+	del socketmap[s]
+	sockets.remove(s)
+	updateHosts()
+
+resetHosts()
+
+def main():
+	while True:
+		inputs, _, _ = select.select(sockets, [], [])
+		for s in inputs:
+			if s == server:
+				conn, addr = s.accept()
+				addHost(conn, addr[0])
+			else:
+				if s in socketmap:
+					if not socketmap[s].update():
+						removeHost(s)
+
+thread.start_new_thread(main, ())
+named.run()

@@ -1,0 +1,26 @@
+requirements:
+
+includes:
+configuration files
+a minimal DNS server to manage node hostnames, also updates /etc/hosts
+
+packages:
+tftpd-hpa
+nfs-server
+python-twisted
+
+setup:
+my layout assumes ubuntu server, but this could be adapted to any distro in theory
+* a chrooted linux distro in a common place, I use /chroot/maverick (because it's ubuntu server 10.10 "maverick")
+(you can use debootstrap to easily install a debian-based system in a chroot)
+* a tftpboot directory in a common place, I'm currently using /tftpboot/maverick/
+   * requires files: pxelinux.0, and vmlinuz+initrd from the chrooted linux
+* configuration and sbin files copied to their respective locations (all non-README files map to their respective paths on the server)
+
+commands:
+* all:
+(if you setup root's ssh keys with chuseradd, you can sudo this to run a command on all servers, like "sudo service apache2 restart"
+run a command on all connected nodes
+
+* chuseradd: (requires sudo/root) add a new user to the system and chroot, or update an existing user's ssh keys with the chroot
+* nodes: list the hostnames and IP addresses of all connected nodes
