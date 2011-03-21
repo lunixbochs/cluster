@@ -1,10 +1,8 @@
-requirements:
-
 includes:
 configuration files
 a minimal DNS server to manage node hostnames, also updates /etc/hosts
 
-packages:
+required packages:
 tftpd-hpa
 nfs-server
 python-twisted
@@ -19,7 +17,7 @@ my layout assumes ubuntu server, but this could be adapted to any distro in theo
 
 commands:
 * all:
-(if you setup root's ssh keys with chuseradd, you can sudo this to run a command on all servers, like "sudo service apache2 restart"
+(if you setup root's ssh keys with chuseradd, you can sudo this to run a command on all servers, like "sudo service apache2 restart")
 run a command on all connected nodes
 
 * chuseradd: (requires sudo/root) add a new user to the system and chroot, or update an existing user's ssh keys with the chroot
