@@ -1,0 +1,13 @@
+server {
+	listen 80;
+	server_name domain.tld; # replace this with an actual public domain name
+	resolver localhost;
+
+	location / {
+		root /var/www;
+
+                if ($request_uri ~* "^/(n\d+)/(.*)" ) {
+                        proxy_pass http://$1/$2;
+                }
+	}
+}
