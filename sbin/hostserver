@@ -170,7 +170,7 @@ def removeHost(conn):
 	if hosts[addr]:
 		resolver.removeHost(hosts[addr])
 
-	hosts.remove(addr)
+	del hosts[addr]
 	del socketmap[s]
 	sockets.remove(s)
 	updateHosts()
