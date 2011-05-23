@@ -1,25 +1,46 @@
 #!/bin/bash -u
-# this script will create "snapshot" backups, with common files hardlinked between
+# creates a backup from $SOURCE to $DEST
+# uses a snapshot system based on day, hour, minute
+# tries to hardlink all files if it can against the last $CURRENT symlink
+# copies first to $TEMP, then to $FINAL if the copy finishes
+# if the copy is successful, updates $CURRENT symlink to the latest
+
+## immediate config
 
 SOURCE="/"
 DEST="/media/backup"
-CURRENT="/media/backup/current"
-TIMESTAMP=`date "+%Y-%m-%d+%H:%M:%S"`
+
+## internal config
+
+CURRENT="$DEST/current"
+INCOMPLETE="$DEST/incomplete"
+SNAPSHOTS="$DEST/snapshots"
+DAYSTAMP=`date "+%Y-%m-%d"`
+TIMESTAMP=`date "+%H:%M"`
+
+TEMP="$INCOMPLETE/$DAYSTAMP+$TIMESTAMP"
+FINAL="$SNAPSHOTS/$DAYSTAMP/$TIMESTAMP"
+
+## magic
 
 CMD="rsync -aP --one-file-system"
 
-mkdir "$DEST/incomplete" 2> /dev/null
-mkdir "$DEST/snapshots" 2> /dev/null
+mkdir "$INCOMPLETE" 2> /dev/null
+mkdir "$SNAPSHOTS" 2> /dev/null
 
-if [ -d "$DEST/current" ]; then
-	$CMD --link-dest="$DEST/" "$SOURCE" "$DEST/incomplete/$TIMESTAMP/"
+if [ -d "$CURRENT" ]; then
+	$CMD --link-dest="$CURRENT/" "$SOURCE" "$TEMP"
 else
-	$CMD "$SOURCE" "$DEST/incomplete/$TIMESTAMP/"
+	$CMD "$SOURCE" "$TEMP"
 fi
 
-if [ -d "$DEST/incomplete/$TIMESTAMP" ]; then
-	mv "$DEST/incomplete/$TIMESTAMP" "$DEST/snapshots/$TIMESTAMP"
-	rm -f "$DEST/current"
-	ln -s "snapshots/$TIMESTAMP" "$DEST/current"
-	rmdir "$DEST/incomplete" 2> /dev/null
+if [ -d "$TEMP" ]; then
+	TARGETDIR=$(dirname "$FINAL")
+	if [ "$SNAPSHOTS" != "$TARGETDIR" ]; then
+		mkdir -p "$TARGETDIR"
+	fi
+	mv "$TEMP" "$FINAL"
+	rm -f "$CURRENT"
+	ln -s "$FINAL" "$CURRENT"
+	rmdir "$INCOMPLETE" 2> /dev/null
 fi
