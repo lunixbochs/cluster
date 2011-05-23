@@ -23,11 +23,10 @@ if len(hosts) > 0:
 				hdict[hostname.strip()] = ip
 
 		for hostname in sorted(hdict):
-			sys.stdout.write('%s-======================[%s %s %s]======================-%s\n' % (bcolors.WARNING, bcolors.HEADER,
+			sys.stderr.write('%s-======================[%s %s %s]======================-%s\n' % (bcolors.WARNING, bcolors.HEADER,
 											hostname,
 											 bcolors.WARNING, bcolors.ENDC))
-			sys.stdout.flush()
-			#print '%s:' % hostname
+			sys.stderr.flush()
 			os.system(command % hostname)
 else:
 		print 'No nodes found.'
